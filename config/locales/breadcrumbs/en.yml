@@ -18,6 +18,8 @@ en:
     categorize: Categorize
     changelog: What's new
     chats: Chats
+    codex_connections: ChatGPT connection
+    codex_tool_approvals: Confirm action
     coinbase_items: Coinbase
     coinstats_items: CoinStats
     credit_cards: Credit cards

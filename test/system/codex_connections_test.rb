@@ -18,5 +18,6 @@ class CodexConnectionsTest < ApplicationSystemTestCase
     click_button "Save and use ChatGPT"
     assert_text "ChatGPT settings saved"
     assert_equal "codex", Setting.llm_provider
+    save_screenshot(Rails.root.join("tmp/screenshots/codex-connection.png"))
   end
 end

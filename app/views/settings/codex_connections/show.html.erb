@@ -19,8 +19,10 @@
       <%= styled_form_with scope: :connection, url: settings_codex_connection_path, method: :patch do |form| %>
         <div class="space-y-3">
           <%= form.select :model, options_for_select([[t(".default_model"), ""]] + @models.map { |model| [model["displayName"], model["id"]] }, Setting.codex_model), label: t(".model") %>
-          <%= form.check_box :background_paused, checked: Setting.codex_background_paused %>
-          <%= form.label :background_paused, t(".pause") %>
+          <div class="flex items-center justify-between gap-4">
+            <%= form.label :background_paused, t(".pause") %>
+            <%= render DS::Toggle.new(id: "connection_background_paused", name: "connection[background_paused]", checked: Setting.codex_background_paused, aria: { label: t(".pause") }) %>
+          </div>
           <%= form.hidden_field :enabled, value: "1" %>
           <%= form.submit t(".enable") %>
         </div>
