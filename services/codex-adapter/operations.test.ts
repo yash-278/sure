@@ -133,12 +133,18 @@ test("cancelling before turn acknowledgement interrupts before the next generati
   const rpc = new EventEmitter();
   let acknowledge = null;
   let interrupted = false;
-  rpc.call = async (method) => {
+  rpc.call = async (method, params) => {
     if (method === "account/read") return { account: { type: "chatgpt" } };
     if (method === "account/rateLimits/read") return {};
     if (method === "model/list")
       return { data: [{ id: "test", isDefault: true }] };
-    if (method === "thread/start") return { thread: { id: "thread" } };
+    if (method === "thread/start") {
+      assert.equal(params.config["features.multi_agent"], false);
+      assert.equal(params.config["features.view_image"], false);
+      assert.equal(params.config["features.image_generation"], false);
+      assert.equal(params.config["features.shell_tool"], false);
+      return { thread: { id: "thread" } };
+    }
     if (method === "turn/start")
       return new Promise((resolve) => {
         acknowledge = resolve;
@@ -167,12 +173,18 @@ test("generation timeout interrupts active work", async (t) => {
   const { EventEmitter } = await import("node:events");
   const rpc = new EventEmitter();
   let interrupted = false;
-  rpc.call = async (method) => {
+  rpc.call = async (method, params) => {
     if (method === "account/read") return { account: { type: "chatgpt" } };
     if (method === "account/rateLimits/read") return {};
     if (method === "model/list")
       return { data: [{ id: "test", isDefault: true }] };
-    if (method === "thread/start") return { thread: { id: "thread" } };
+    if (method === "thread/start") {
+      assert.equal(params.config["features.multi_agent"], false);
+      assert.equal(params.config["features.view_image"], false);
+      assert.equal(params.config["features.image_generation"], false);
+      assert.equal(params.config["features.shell_tool"], false);
+      return { thread: { id: "thread" } };
+    }
     if (method === "turn/start") return { turn: { id: "turn" } };
     if (method === "turn/interrupt") {
       interrupted = true;
