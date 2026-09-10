@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { CodexRpc } from "./rpc.ts";
+import { CodexRpc, safeError } from "./rpc.ts";
 function fixture() {
   const child = Object.assign(new EventEmitter(), {
     stdin: new PassThrough(),
@@ -57,4 +57,15 @@ test("timeouts remove pending requests", async () => {
     message: "codex_timeout",
   });
   assert.equal(rpc.pending.size, 0);
+});
+
+test("authentication and quota errors retain only safe recovery codes", () => {
+  assert.equal(
+    safeError({ message: "401 Unauthorized with private credentials" }).message,
+    "not_connected",
+  );
+  assert.equal(
+    safeError({ message: "429 usage limit exceeded" }).message,
+    "quota_exhausted",
+  );
 });

@@ -130,7 +130,13 @@ const server = createServer(async (req, res) => {
       return reply(200, { state: "disconnected" });
     }
     reply(404, { error: "not_found" });
-  } catch {
+  } catch (error) {
+    if (
+      error.message === "not_connected" &&
+      req.method === "GET" &&
+      req.url === "/account"
+    )
+      return reply(200, { account: null });
     reply(503, { error: "codex_request_failed" });
   }
 });

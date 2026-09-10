@@ -1,6 +1,19 @@
 import { EventEmitter } from "node:events";
 import { createInterface } from "node:readline";
 
+export function safeError(error) {
+  const message = String(error?.message || "");
+  if (
+    /\b401\b|unauthorized|authentication|refresh[_ ]token|sign.in required/i.test(
+      message,
+    )
+  )
+    return new Error("not_connected");
+  if (/\b429\b|quota exceeded|usage limit|rate limit/i.test(message))
+    return new Error("quota_exhausted");
+  return new Error("codex_request_failed");
+}
+
 // Never forward raw RPC errors: upstream diagnostics can contain credentials.
 export class CodexRpc extends EventEmitter {
   child;
@@ -30,7 +43,7 @@ export class CodexRpc extends EventEmitter {
         if (!pending) return;
         clearTimeout(pending.timer);
         this.pending.delete(message.id);
-        if (message.error) pending.reject(new Error("codex_request_failed"));
+        if (message.error) pending.reject(safeError(message.error));
         else pending.resolve(message.result);
       } else if (message.method) {
         this.emit(message.method, message.params);

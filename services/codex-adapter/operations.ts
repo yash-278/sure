@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { safeError } from "./rpc.ts";
 
 export class Operations {
   rpc;
@@ -148,6 +149,7 @@ export class Operations {
         } catch (error) {
           if (this.get(request.id).status !== "running") continue;
           if (error.message === "quota_exhausted") {
+            this.quotaUntil = Math.max(this.quotaUntil, Date.now() + 60000);
             this.save({
               ...operation,
               status: "waiting_quota",
@@ -248,7 +250,7 @@ export class Operations {
         if (p.threadId !== thread.id) return;
         cleanup();
         if (p.turn.status !== "completed")
-          return reject(new Error("generation_failed"));
+          return reject(safeError(p.turn.error));
         try {
           resolve({ output: JSON.parse(text), model: model.id });
         } catch {
@@ -287,9 +289,9 @@ export class Operations {
             if (this.active?.id === request.id)
               this.active.turnId = result.turn.id;
           })
-          .catch(() => {
+          .catch((error) => {
             cleanup();
-            reject(new Error("generation_failed"));
+            reject(error);
           });
       }
     });
