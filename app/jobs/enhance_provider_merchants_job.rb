@@ -1,4 +1,5 @@
 class EnhanceProviderMerchantsJob < ApplicationJob
+  include CodexBackgroundWork
   queue_as :medium_priority
 
   def perform(family)

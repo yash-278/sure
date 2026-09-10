@@ -59,10 +59,12 @@ class RecurringTransaction
         raise Error, "Provider failed: #{result.error&.message}" unless result.success?
 
         normalize(result.data)
+      rescue Provider::Codex::Deferred => error
+        raise Error, error.message
       end
 
       def llm_provider
-        Provider::Registry.preferred_llm_provider
+        Ai::Features.provider(:bill_suggestions, family: family)
       end
 
       def charges_from(entries)

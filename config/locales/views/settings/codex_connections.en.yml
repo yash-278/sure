@@ -1,0 +1,33 @@
+en:
+  settings:
+    codex_connections:
+      show:
+        title: ChatGPT connection
+        preview: Preview
+        consent_required: AI sharing is off. Enable it in Preferences before using financial AI.
+        preferences: Open Preferences
+        description: Use your ChatGPT subscription for Sure's AI features. Only your account can use this connection.
+        unavailable: The ChatGPT service is unavailable. Try again shortly.
+        connected: "Connected as %{email}. Plan: %{plan}."
+        quota: "%{used}% used in the %{minutes}-minute window. Resets %{reset}."
+        quota_unknown: Quota information is currently unavailable.
+        unknown: Unknown
+        default_model: Account default
+        model: Model
+        pause: Pause background AI
+        enable: Save and use ChatGPT
+        disconnect: Disconnect ChatGPT
+        enter_code: Open the OpenAI sign-in page and enter this code.
+        open_login: Open OpenAI sign-in
+        cancel: Cancel sign-in
+        connect: Connect ChatGPT
+        limits_notice: This shares your Codex allowance. Reaching a limit pauses AI work; Sure never switches to paid API calls automatically.
+        document_search: Searching across saved documents is not available with this connection. Statement extraction is supported.
+      create:
+        failed: Could not start ChatGPT sign-in. Try again.
+      update:
+        saved: ChatGPT settings saved.
+        failed: Could not save ChatGPT settings. Check the connection and selected model.
+      destroy:
+        disconnected: ChatGPT disconnected. No paid provider was enabled.
+        failed: Could not disconnect ChatGPT. Try again.

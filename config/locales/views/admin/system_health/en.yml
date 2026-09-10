@@ -126,6 +126,7 @@ en:
             failure_reason: Failure reason
           providers:
             openai: OpenAI
+            codex: ChatGPT subscription
             openai_compatible: OpenAI-compatible
             anthropic: Anthropic
             ollama: Ollama

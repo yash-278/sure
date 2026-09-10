@@ -1,0 +1,8 @@
+{
+  "name": "sure-codex-adapter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {"start": "node server.ts", "test": "node --test *.test.ts"},
+  "engines": {"node": ">=24"}
+}

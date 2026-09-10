@@ -1,0 +1,101 @@
+en:
+  settings:
+    ai_features:
+      update:
+        saved: AI settings saved.
+      create:
+        tested: Synthetic model test passed. No financial data was sent.
+      show:
+        title: AI settings
+        description: Choose a model for each feature. Nothing is selected automatically, and failures never switch providers.
+        sharing: Allow financial data to be sent to AI
+        pause: Pause background AI
+        save_controls: Save sharing controls
+        connections: Connections
+        states:
+          connected: Connected — authentication checked
+          disconnected: Not connected
+          expired: Reconnect required
+          unreachable: Service unreachable
+          quota: Quota exhausted
+        checked: "Last successful check: %{time}"
+        unknown: Unknown
+        quota: "%{used}% used · reset %{reset}"
+        subscription: Uses your Codex allowance. Authentication alone does not verify model generation.
+        api_billing: API usage is billed separately. Authentication alone does not verify model generation.
+        login_retry: Sign-in expired or failed. Start again to get a new code.
+        connect: Connect ChatGPT
+        model_unavailable: Selected model unavailable · paused
+        reconnect: Reconnect ChatGPT
+        manage_connection: Manage login or disconnect
+        api_credentials: Add or update API credentials
+        check_again: Check connections again
+        features: AI features
+        unconfigured: Not configured · off
+        configured: Configured
+        consent_off: Configured · AI sharing off
+        data_used: "Data used:"
+        guidance: Model guidance
+        choose: Choose a model · feature off
+        verification_required: Verify this model first
+        image_required: Image input required
+        saved_selection: Saved selection
+        incompatible: Capability unavailable or verification required
+        unavailable_selection: "%{model} · currently unavailable"
+        model: Model and connection
+        show_options: Show reasoning options
+        choose_reasoning: Choose a reasoning level
+        reasoning: Reasoning level
+        no_reasoning: Reasoning options appear after selecting a model that exposes them.
+        save_feature: Save feature
+        test_notice: Tests the saved model with synthetic data. This consumes subscription allowance or separately billed API usage.
+        test: Test saved model
+        manual: Verify a model not listed by your API connection
+        connection: Connection
+        model_id: Exact model identifier
+        manual_reasoning: Supported effort value, if the model exposes one
+        images: Verify image input
+        verify: Run synthetic verification
+        search: Document search
+        search_unavailable: Unavailable through ChatGPT. Search requires a separate retrieval and indexing setup; selecting a chat model does not enable it.
+        feature:
+          chat:
+            name: Chat and requested edits
+            description: Answer questions and request authorised financial changes.
+            data: Messages, conversation history and permitted financial tool results.
+            guidance: Multi-step questions and tool use may benefit from a stronger reasoning model.
+          categorisation:
+            name: Transaction categorisation
+            description: Assign categories to transactions.
+            data: Transaction descriptions, amounts and available categories.
+            guidance: Usually a simple classification task; a smaller model may be sufficient.
+          merchant_detection:
+            name: Merchant detection
+            description: Identify merchants behind transaction descriptions.
+            data: Transaction descriptions and existing merchants.
+            guidance: Often a matching task; ambiguous descriptions may need a more capable model.
+          merchant_enrichment:
+            name: Merchant enrichment
+            description: Suggest official merchant websites.
+            data: Merchant names and existing details.
+            guidance: A larger model does not guarantee correct websites. Uncertain results should remain unset.
+          bill_suggestions:
+            name: Bill suggestions
+            description: Suggest recurring bill amounts and schedules.
+            data: Dated charges, categories and existing bill configuration.
+            guidance: Irregular charges and schedules may benefit from stronger reasoning.
+          insight_narration:
+            name: Insight narration
+            description: Explain financial insights already calculated by Sure.
+            data: Computed facts for each insight.
+            guidance: Primarily a writing task; a smaller model may be sufficient.
+          pdf_summary:
+            name: PDF identification and summary
+            description: Identify document type and summarise its contents.
+            data: PDF text or images of scanned pages.
+            guidance: Requires image capability for scans. Complex layouts may need a more capable model.
+          statement_extraction:
+            name: Statement extraction
+            description: Extract transactions for review before import.
+            data: Statement text or scanned pages, including dates and amounts.
+            guidance: Accuracy matters. Complex tables and scans may need a stronger image-capable model.

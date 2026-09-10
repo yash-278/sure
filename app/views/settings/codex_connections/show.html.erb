@@ -1,0 +1,47 @@
+<%= content_for :page_title, t(".title") %>
+<p><%= link_to t("settings.ai_features.show.title"), settings_ai_feature_path, class: "text-link" %></p>
+<%= settings_section title: t(".title") do %>
+  <div class="space-y-4" data-controller="codex-login" data-codex-login-pending-value="<%= @login&.dig("state") == "pending" %>">
+    <%= render DS::Pill.new(label: t(".preview")) %>
+    <p class="text-secondary text-sm"><%= t(".description") %></p>
+    <% unless Current.user.ai_enabled %>
+      <p class="text-warning"><%= t(".consent_required") %> <%= link_to t(".preferences"), settings_preferences_path, class: "text-link" %></p>
+    <% end %>
+    <% if @unavailable %>
+      <p class="text-warning"><%= t(".unavailable") %></p>
+      <%= render DS::Button.new(text: t("settings.ai_features.show.reconnect"), href: settings_codex_connection_path, method: :post) %>
+    <% elsif @account %>
+      <p><%= t(".connected", email: @account["email"], plan: @account["planType"].presence || t(".unknown")) %></p>
+      <% if @limits&.dig("rateLimits").blank? %>
+        <p class="text-secondary"><%= t(".quota_unknown") %></p>
+      <% end %>
+      <% [@limits&.dig("rateLimits", "primary"), @limits&.dig("rateLimits", "secondary")].compact.each do |window| %>
+        <p class="text-sm text-secondary"><%= t(".quota", used: window["usedPercent"] || t(".unknown"), minutes: window["windowDurationMins"] || t(".unknown"), reset: window["resetsAt"] ? l(Time.at(window["resetsAt"]), format: :long) : t(".unknown")) %></p>
+      <% end %>
+      <%= styled_form_with scope: :connection, url: settings_codex_connection_path, method: :patch do |form| %>
+        <div class="space-y-3">
+          <%= form.select :model, options_for_select([[t(".default_model"), ""]] + @models.map { |model| [model["displayName"], model["id"]] }, Setting.codex_model), label: t(".model") %>
+          <div class="flex items-center justify-between gap-4">
+            <%= form.label :background_paused, t(".pause") %>
+            <%= render DS::Toggle.new(id: "connection_background_paused", name: "connection[background_paused]", checked: Setting.codex_background_paused, aria: { label: t(".pause") }) %>
+          </div>
+          <%= form.hidden_field :enabled, value: "1" %>
+          <%= form.submit t(".enable") %>
+        </div>
+      <% end %>
+      <%= render DS::Button.new(text: t(".disconnect"), href: settings_codex_connection_path, method: :delete, variant: "destructive") %>
+    <% elsif @login&.dig("state") == "pending" %>
+      <p><%= t(".enter_code") %></p>
+      <p class="font-mono text-lg"><%= @login["userCode"] %></p>
+      <%= link_to t(".open_login"), "https://auth.openai.com/codex/device", target: "_blank", rel: "noopener noreferrer", class: "text-link" %>
+      <%= render DS::Button.new(text: t(".cancel"), href: settings_codex_connection_path, method: :patch, params: { cancel_login: "1" }, variant: "secondary") %>
+    <% else %>
+      <% if @login&.dig("state").in?(%w[expired failed]) %>
+        <p class="text-warning"><%= t("settings.ai_features.show.login_retry") %></p>
+      <% end %>
+      <%= render DS::Button.new(text: t(".connect"), href: settings_codex_connection_path, method: :post) %>
+    <% end %>
+    <p class="text-sm text-secondary"><%= t(".limits_notice") %></p>
+    <p class="text-sm text-secondary"><%= t(".document_search") %></p>
+  </div>
+<% end %>

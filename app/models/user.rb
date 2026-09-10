@@ -194,6 +194,9 @@ class User < ApplicationRecord
   end
 
   def ai_available?
+    return id == Ai::Features.owner.id && preview_features_enabled? if Ai::Features.managed?(family)
+    return Provider::Codex.available_for?(self) if Provider::Codex.selected?
+
     return true unless Rails.application.config.app_mode.self_hosted?
 
     effective_type = ENV["ASSISTANT_TYPE"].presence || family&.assistant_type.presence || "builtin"

@@ -309,7 +309,9 @@ class Provider::Anthropic < Provider
   end
 
   private
-    attr_reader :client
+    def client
+      @reasoning_client ||= Ai::ReasoningClient.new(@client, :anthropic)
+    end
 
     def default_max_tokens
       ENV.fetch("ANTHROPIC_MAX_TOKENS", 4096).to_i

@@ -216,8 +216,11 @@ class PdfImport < Import
   def process_with_ai
     # Honors Setting.llm_provider (issue #2113) — Provider::Anthropic implements
     # process_pdf (PR #1985).
-    provider = Provider::Registry.preferred_llm_provider
-    raise Provider::Error, I18n.t("imports.pdf_import.errors.provider_not_configured") unless provider
+    provider = Ai::Features.provider(:pdf_summary, family: family)
+    if provider.nil?
+      raise Provider::Codex::Deferred.new(:feature_unconfigured) if Ai::Features.managed?(family)
+      raise Provider::Error, I18n.t("imports.pdf_import.errors.provider_not_configured")
+    end
     raise Provider::Error, I18n.t("imports.pdf_import.errors.provider_no_pdf_support") unless provider.supports_pdf_processing?
 
     response = provider.process_pdf(
@@ -244,8 +247,11 @@ class PdfImport < Import
 
     # Honors Setting.llm_provider (issue #2113) — Provider::Anthropic implements
     # extract_bank_statement (PR #1985).
-    provider = Provider::Registry.preferred_llm_provider
-    raise Provider::Error, I18n.t("imports.pdf_import.errors.provider_not_configured") unless provider
+    provider = Ai::Features.provider(:statement_extraction, family: family)
+    if provider.nil?
+      raise Provider::Codex::Deferred.new(:feature_unconfigured) if Ai::Features.managed?(family)
+      raise Provider::Error, I18n.t("imports.pdf_import.errors.provider_not_configured")
+    end
 
     response = provider.extract_bank_statement(
       pdf_content: pdf_file_content,
@@ -297,6 +303,9 @@ class PdfImport < Import
       end
 
       currency = account&.currency || family.currency
+      if extracted_data["extraction_provider"] == "codex" && extracted_data["currency"].present? && extracted_data["currency"] != currency
+        raise Provider::Codex::Error, "Statement currency does not match the selected account. Choose an account with the statement currency before importing."
+      end
       candidates = extracted_transactions.map.with_index(1) do |txn, index|
         Import::Row.new(
           import: self,

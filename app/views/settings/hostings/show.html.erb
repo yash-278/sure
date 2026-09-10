@@ -1,3 +1,8 @@
+<% if Provider::Codex.available_for?(Current.user) %>
+  <%= settings_section title: t("settings.codex_connections.show.title") do %>
+    <%= link_to t("settings.codex_connections.show.title"), settings_codex_connection_path, class: "text-link" %>
+  <% end %>
+<% end %>
 <%= content_for :page_title, t(".title") %>
 <%= settings_section title: t(".ai_assistant") do %>
   <%= render "settings/hostings/assistant_settings" %>

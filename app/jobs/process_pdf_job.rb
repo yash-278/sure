@@ -1,4 +1,5 @@
 class ProcessPdfJob < ApplicationJob
+  include CodexBackgroundWork
   queue_as :medium_priority
 
   discard_on(Provider::Error) do |job, err|
@@ -14,7 +15,11 @@ class ProcessPdfJob < ApplicationJob
     pdf_import.update!(status: :importing)
 
     begin
-      process_result = pdf_import.process_with_ai
+      process_result = if pdf_import.ai_processed?
+        Provider::LlmConcept::PdfProcessingResult.new(summary: pdf_import.ai_summary, document_type: pdf_import.document_type, extracted_data: pdf_import.extracted_data)
+      else
+        pdf_import.process_with_ai
+      end
       document_type = resolve_document_type(pdf_import, process_result)
       upload_to_vector_store(pdf_import, document_type: document_type)
 
@@ -40,6 +45,9 @@ class ProcessPdfJob < ApplicationJob
       # Other document types are marked complete (no further action needed)
       final_status = statement_with_transactions?(document_type) && pdf_import.rows_count > 0 ? :pending : :complete
       pdf_import.update!(status: final_status)
+    rescue Provider::Codex::Deferred
+      pdf_import.update!(status: :pending)
+      raise
     rescue StandardError => e
       sanitized_error = sanitize_error_message(e)
       Rails.logger.error("PDF processing failed for import #{pdf_import.id}: #{e.class.name} - #{sanitized_error}")
@@ -66,6 +74,8 @@ class ProcessPdfJob < ApplicationJob
     end
 
     def upload_to_vector_store(pdf_import, document_type:)
+      return if Provider::Codex.selected? || Ai::Features.managed?(pdf_import.family)
+
       file_content = pdf_import.pdf_file_content
 
       family_document = pdf_import.family.upload_document(

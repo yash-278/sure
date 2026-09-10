@@ -1,0 +1,10 @@
+en:
+  codex_tool_approvals:
+    show:
+      title: Confirm balance replacement
+      description: This action replaces an existing valuation. Review the exact values before approving.
+      approve: Approve replacement
+      reject: Reject
+      resolved: This request has already been resolved.
+    update:
+      saved: Your decision was recorded.

@@ -1,4 +1,5 @@
 class AutoCategorizeJob < ApplicationJob
+  include CodexBackgroundWork
   queue_as :medium_priority
 
   def perform(family, transaction_ids: [], rule_run_id: nil)
@@ -7,6 +8,8 @@ class AutoCategorizeJob < ApplicationJob
 
     # If this job was part of a rule run, report back the modified count
     rule_run&.complete_job!(modified_count: modified_count)
+  rescue Provider::Codex::Deferred
+    raise
   rescue => error
     rule_run&.fail_job!(error: error, source: self.class.name, transaction_ids: transaction_ids)
 

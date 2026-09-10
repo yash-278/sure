@@ -149,3 +149,6 @@ group :test do
   gem "climate_control"
   gem "simplecov", require: false
 end
+
+# Validate subscription-provider structured output before financial actions.
+gem "json-schema", "~> 5.2"

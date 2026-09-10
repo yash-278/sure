@@ -61,6 +61,7 @@ class AiHealth
   def function_calling_status
     return :unavailable unless llm_configured?
     return :not_checked unless run_probes?
+    return :not_checked if function_calling_probe.status == :not_checked
     return :supported if function_calling_probe.passing?
     return :not_used if function_calling_probe.failure_code == :no_tool_call
     return :unsupported if function_calling_probe.failure_code == :tools_refused
@@ -171,7 +172,7 @@ class AiHealth
       @pdf_processing_capable = safely(false) do
         @llm_provider&.supports_pdf_processing?(model: llm_model)
       end
-      @pdf_text_extraction_capable = @pdf_processing_capable && @effective_llm_protocol == :openai
+      @pdf_text_extraction_capable = @pdf_processing_capable && %i[openai codex].include?(@effective_llm_protocol)
       @pdf_vision_processing_capable = @pdf_processing_capable
 
       @openai_endpoint = redact_endpoint(openai_uri_base.presence || OPENAI_DEFAULT_ENDPOINT)
@@ -204,6 +205,17 @@ class AiHealth
       @vector_store_probe = vector_store_adapter.present? ? Probe.not_checked : Probe.not_configured
       @embedding_probe = vector_store_adapter == :pgvector ? Probe.not_checked : Probe.not_configured
       return unless run_probes?
+
+      if @effective_llm_protocol == :codex
+        begin
+          account = Provider::Codex::Client.new(read_timeout: probe_request_timeout).request(:get, "/account")
+          status = account.dig("account", "type") == "chatgpt" ? :passing : :failing
+          @llm_probe = Probe::Result.new(status: status, checked_at: Time.current, failure_code: status == :passing ? nil : :not_connected, http_status: nil)
+        rescue Provider::Codex::Error
+          @llm_probe = Probe::Result.new(status: :failing, checked_at: Time.current, failure_code: :unreachable, http_status: nil)
+        end
+        return
+      end
 
       probe = Probe.new(force: @force_probes, cache: @probe_cache)
       if llm_configured?
@@ -268,6 +280,7 @@ class AiHealth
       return :unavailable unless llm_configured?
       return :unsupported unless capable
       return :not_checked unless run_probes?
+      return :not_checked if probe.status == :not_checked
 
       probe.passing? ? :supported : :failing
     end
@@ -286,11 +299,12 @@ class AiHealth
     end
 
     def normalized_llm_provider(value)
-      value.to_s == "anthropic" ? :anthropic : :openai
+      %w[anthropic codex].include?(value.to_s) ? value.to_sym : :openai
     end
 
     def protocol_name(provider)
       case provider
+      when Provider::Codex then :codex
       when Provider::Openai then :openai
       when Provider::Anthropic then :anthropic
       end
@@ -328,6 +342,7 @@ class AiHealth
 
     def effective_model(provider)
       case provider
+      when :codex then Provider::Codex.effective_model || "codex"
       when :anthropic then Provider::Anthropic.effective_model
       else Provider::Openai.effective_model
       end
@@ -339,10 +354,14 @@ class AiHealth
     end
 
     def default_endpoint(provider)
+      return nil if provider == :codex
+
       provider == :anthropic ? ANTHROPIC_DEFAULT_ENDPOINT : OPENAI_DEFAULT_ENDPOINT
     end
 
     def raw_endpoint(provider)
+      return ENV["CODEX_ADAPTER_URL"] if provider == :codex
+
       provider == :anthropic ? anthropic_base_url : openai_uri_base
     end
 
@@ -362,6 +381,8 @@ class AiHealth
 
     # Reports the timeout used by normal LLM requests for the selected provider.
     def request_timeout(provider)
+      return 240 if provider == :codex
+
       if provider == :anthropic
         ENV.fetch("ANTHROPIC_REQUEST_TIMEOUT", 600).to_i
       else

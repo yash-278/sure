@@ -1,10 +1,16 @@
 class Rule::ActionExecutor::AutoCategorize < Rule::ActionExecutor
   def label
     base_label = "Auto-categorize transactions with AI"
+    if Ai::Features.managed?(rule.family)
+      selection = Ai::Features.new(Ai::Features.owner).configuration(:categorisation)
+      return "#{base_label} (#{selection["connection"] == "codex" ? "subscription allowance" : "configured API; cost unknown"})" if selection.present?
+      return "#{base_label} (not configured)"
+    end
+    return "#{base_label} (ChatGPT subscription allowance)" if Provider::Codex.selected?
 
     if rule.family.self_hoster?
       # Use the same provider determination logic as Family::AutoCategorizer
-      llm_provider = Provider::Registry.get_provider(:openai)
+      llm_provider = Provider::Registry.preferred_llm_provider
 
       if llm_provider
         # Estimate cost for typical batch of 20 transactions
@@ -44,7 +50,7 @@ class Rule::ActionExecutor::AutoCategorize < Rule::ActionExecutor
       return 0
     end
 
-    batch_size = 20
+    batch_size = (Provider::Codex.selected? || Ai::Features.managed?(rule.family)) ? 25 : 20
     jobs_count = 0
 
     enrichable_transactions.in_batches(of: batch_size).each_with_index do |transactions, idx|

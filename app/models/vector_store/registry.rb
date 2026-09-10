@@ -12,6 +12,8 @@ class VectorStore::Registry
     # :pgvector, and anything else falls back to :openai when OpenAI
     # credentials are present.
     def adapter
+      return nil if Provider::Codex.selected?
+
       name = adapter_name
       return nil unless name
 
@@ -23,6 +25,8 @@ class VectorStore::Registry
     end
 
     def adapter_name
+      return nil if Provider::Codex.selected?
+
       explicit = ENV["VECTOR_STORE_PROVIDER"].presence
       return explicit.to_sym if explicit && ADAPTERS.key?(explicit.to_sym)
 

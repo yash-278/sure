@@ -4,7 +4,7 @@ module BillsHelper
   # install renders no AI affordances at all, following the Rules registry's
   # conditional-executor precedent.
   def bills_one_shot_ai_available?
-    Current.user&.ai_enabled? && Provider::Registry.preferred_llm_provider.present?
+    Current.user&.ai_enabled? && Ai::Features.provider(:bill_suggestions, family: Current.family).present?
   end
 
   # Two bills can be genuinely indistinguishable on a row -- same merchant,

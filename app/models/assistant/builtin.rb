@@ -18,11 +18,22 @@ class Assistant::Builtin < Assistant::Base
   end
 
   def respond_to(message, assistant_message: nil)
+    raise Provider::Codex::Error, "ChatGPT is restricted to its connected owner" if Provider::Codex.selected? && !Provider::Codex.available_for?(chat.user)
+
     assistant_message ||= AssistantMessage.new(chat: chat, content: "", ai_model: message.ai_model)
 
-    llm_provider = get_model_provider(message.ai_model)
+    llm_provider = if Ai::Features.managed?(chat.user.family)
+      Ai::Features.new(chat.user).provider(:chat)
+    else
+      get_model_provider(message.ai_model)
+    end
     unless llm_provider
       raise StandardError, build_no_provider_error_message(message.ai_model)
+    end
+
+    if llm_provider.respond_to?(:selected_model)
+      message.update!(ai_model: llm_provider.selected_model)
+      assistant_message.ai_model = llm_provider.selected_model
     end
 
     responder = Assistant::Responder.new(
@@ -73,7 +84,7 @@ class Assistant::Builtin < Assistant::Base
 
     def function_tool_caller
       @function_tool_caller ||= Assistant::FunctionToolCaller.new(
-        functions.map { |fn| fn.new(chat.user) }
+        functions.reject { |fn| (Provider::Codex.selected? || Ai::Features.managed?(chat.user.family)) && fn == Assistant::Function::SearchFamilyFiles }.map { |fn| fn.new(chat.user) }, chat: chat
       )
     end
 
