@@ -165,6 +165,7 @@ export class Operations {
                 "not_connected",
                 "model_unavailable",
                 "image_not_supported",
+                "reasoning_not_supported",
               ].includes(error.message)
                 ? error.message
                 : "generation_failed",
@@ -198,11 +199,29 @@ export class Operations {
         : Date.now() + 60000;
       throw new Error("quota_exhausted");
     }
-    const catalog = await this.rpc.call("model/list", { includeHidden: false });
+    const catalog = { data: [] };
+    let cursor = null;
+    do {
+      const page = await this.rpc.call("model/list", {
+        includeHidden: false,
+        cursor,
+      });
+      catalog.data.push(...page.data);
+      if (page.nextCursor && page.nextCursor === cursor)
+        throw new Error("invalid_cursor");
+      cursor = page.nextCursor;
+    } while (cursor);
     const model = request.model
       ? catalog.data.find((x) => x.id === request.model)
       : catalog.data.find((x) => x.isDefault);
     if (!model) throw new Error("model_unavailable");
+    if (
+      request.reasoning != null &&
+      !(model.supportedReasoningEfforts || []).some(
+        (level) => level.reasoningEffort === request.reasoning,
+      )
+    )
+      throw new Error("reasoning_not_supported");
     if (request.images?.length && !model.inputModalities?.includes("image"))
       throw new Error("image_not_supported");
     const { thread } = await this.rpc.call("thread/start", {
@@ -282,6 +301,7 @@ export class Operations {
           threadId: thread.id,
           input,
           outputSchema: request.schema,
+          ...(request.reasoning ? { effort: request.reasoning } : {}),
         });
         this.active.started = started;
         started

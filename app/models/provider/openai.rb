@@ -301,6 +301,7 @@ class Provider::Openai < Provider
   # Can be disabled via ENV for OpenAI-compatible endpoints that don't support vision
   # Only vision-capable models (gpt-4o, gpt-4-turbo, gpt-4.1, etc.) support PDF input
   def supports_pdf_processing?(model: @default_model)
+    return Current.ai_model_images unless Current.ai_model_images.nil?
     return false unless ENV.fetch("OPENAI_SUPPORTS_PDF_PROCESSING", "true").to_s.downcase.in?(%w[true 1 yes])
 
     # Custom providers manage their own model capabilities
@@ -407,7 +408,9 @@ class Provider::Openai < Provider
   end
 
   private
-    attr_reader :client
+    def client
+      @reasoning_client ||= Ai::ReasoningClient.new(@client, :openai)
+    end
 
     # Substitutes {session_id} into session-valued extra headers for this chat
     # request. Static headers were already set at construction; a session
@@ -489,7 +492,7 @@ class Provider::Openai < Provider
           nil
         end
 
-        input_payload = chat_config.build_input(prompt: prompt)
+        input_payload = Current.ai_response_history.present? ? Ai::ResponseHistory.new(Current.ai_response_history).input : chat_config.build_input(prompt: prompt)
 
         begin
           request_params = {

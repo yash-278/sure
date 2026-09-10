@@ -364,6 +364,7 @@ Rails.application.routes.draw do
   end
 
   namespace :settings do
+    resource :ai_feature, only: %i[show update create]
     resource :codex_connection, only: %i[show create update destroy]
 
     resource :profile, only: [ :show, :destroy ]

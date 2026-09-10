@@ -15,7 +15,11 @@ class ProcessPdfJob < ApplicationJob
     pdf_import.update!(status: :importing)
 
     begin
-      process_result = pdf_import.process_with_ai
+      process_result = if pdf_import.ai_processed?
+        Provider::LlmConcept::PdfProcessingResult.new(summary: pdf_import.ai_summary, document_type: pdf_import.document_type, extracted_data: pdf_import.extracted_data)
+      else
+        pdf_import.process_with_ai
+      end
       document_type = resolve_document_type(pdf_import, process_result)
       upload_to_vector_store(pdf_import, document_type: document_type)
 
@@ -70,7 +74,7 @@ class ProcessPdfJob < ApplicationJob
     end
 
     def upload_to_vector_store(pdf_import, document_type:)
-      return if Provider::Codex.selected?
+      return if Provider::Codex.selected? || Ai::Features.managed?(pdf_import.family)
 
       file_content = pdf_import.pdf_file_content
 

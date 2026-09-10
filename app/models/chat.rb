@@ -61,6 +61,9 @@ class Chat < ApplicationRecord
     # provider's classes would later raise "no LLM provider supports model …"
     # even when the other provider is configured.
     def default_model
+      if Ai::Features.managed?(Current.family)
+        return Ai::Features.new(Current.user).configuration(:chat)["model"] || "unconfigured"
+      end
       return Provider::Codex.effective_model || "codex" if Provider::Codex.selected?
 
       prefers_anthropic = Setting.llm_provider == "anthropic"

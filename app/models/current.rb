@@ -1,6 +1,7 @@
 class Current < ActiveSupport::CurrentAttributes
   attribute :user_agent, :ip_address
 
+  attribute :ai_reasoning, :ai_model_images, :ai_response_history
   attribute :session
   attribute :latest_sync_by_syncable, :latest_completed_sync_by_syncable, :syncing_by_syncable
 

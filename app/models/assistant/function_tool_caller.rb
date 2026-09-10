@@ -11,10 +11,10 @@ class Assistant::FunctionToolCaller
 
   def fulfill_requests(function_requests)
     function_requests.map do |function_request|
-      result = if Provider::Codex.selected? && @chat && replaces_valuation?(function_request)
+      result = if (Provider::Codex.selected? || Ai::Features.managed?(@chat&.user&.family)) && @chat && replaces_valuation?(function_request)
         approval = CodexToolApproval.for_request(@chat, function_request)
         approval.status == "approved" ? approval.result : { status: approval.status, message: "The balance replacement needs approval before it can run.", approval_url: Rails.application.routes.url_helpers.codex_tool_approval_path(approval) }
-      elsif Provider::Codex.selected? && @chat
+      elsif (Provider::Codex.selected? || Ai::Features.managed?(@chat&.user&.family)) && @chat
         CodexToolExecution.once(@chat, function_request) { execute(function_request) }
       else
         execute(function_request)

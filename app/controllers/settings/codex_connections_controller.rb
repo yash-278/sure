@@ -6,6 +6,8 @@ class Settings::CodexConnectionsController < ApplicationController
   def show
     @account = client.request(:get, "/account")["account"]
     @login = client.request(:get, "/login")
+    @account = nil if @login["state"] == "pending"
+    CodexResumeJobsJob.perform_later if @account && Ai::Features.managed?(Current.family) && Current.user.ai_enabled?
     @limits = client.request(:get, "/limits") if @account
     @models = @account ? client.request(:get, "/models").fetch("data") : []
   rescue Provider::Codex::Error
@@ -14,6 +16,7 @@ class Settings::CodexConnectionsController < ApplicationController
   end
 
   def create
+    client.request(:delete, "/login")
     client.request(:post, "/login")
     redirect_to settings_codex_connection_path
   rescue Provider::Codex::Error

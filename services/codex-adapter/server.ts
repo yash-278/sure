@@ -51,7 +51,7 @@ const server = createServer(async (req, res) => {
     return reply(401, { error: "unauthorized" });
   try {
     if (req.method === "GET" && req.url === "/account") {
-      const result = await rpc.call("account/read", { refreshToken: false });
+      const result = await rpc.call("account/read", { refreshToken: true });
       // Never return tokens even if upstream adds fields in a later release.
       return reply(200, {
         account: result.account
@@ -63,8 +63,21 @@ const server = createServer(async (req, res) => {
           : null,
       });
     }
-    if (req.method === "GET" && req.url === "/models")
-      return reply(200, await rpc.call("model/list", { includeHidden: false }));
+    if (req.method === "GET" && req.url === "/models") {
+      const data = [];
+      let cursor = null;
+      do {
+        const page = await rpc.call("model/list", {
+          includeHidden: false,
+          cursor,
+        });
+        data.push(...page.data);
+        if (page.nextCursor && page.nextCursor === cursor)
+          throw new Error("invalid_cursor");
+        cursor = page.nextCursor;
+      } while (cursor);
+      return reply(200, { data });
+    }
     if (req.method === "GET" && req.url === "/limits") {
       const limits = await rpc.call("account/rateLimits/read");
       return reply(200, {
@@ -82,6 +95,14 @@ const server = createServer(async (req, res) => {
       operations.pause(body.paused);
       return reply(200, { paused: operations.paused });
     }
+    if (req.method === "DELETE" && req.url === "/operations") {
+      operations.pause(true);
+      for (const request of [...operations.queue])
+        await operations.cancel(request.id);
+      if (operations.currentRequest)
+        await operations.cancel(operations.currentRequest);
+      return reply(200, { status: "cancelled" });
+    }
     if (req.method === "POST" && req.url === "/operations")
       return reply(202, operations.submit(await readBody(req)));
     const operationPath = req.url?.match(
@@ -95,8 +116,13 @@ const server = createServer(async (req, res) => {
       await operations.cancel(operationPath[1]);
       return reply(200, { status: "cancelled" });
     }
-    if (req.method === "GET" && req.url === "/login")
+    if (req.method === "GET" && req.url === "/login") {
+      if (login?.state === "pending" && Date.now() > login.expiresAt) {
+        await rpc.call("account/login/cancel", { loginId: login.loginId });
+        login = { state: "expired" };
+      }
       return reply(200, login || { state: "idle" });
+    }
     if (req.method === "POST" && req.url === "/login") {
       if (login?.state === "pending" || login?.state === "starting")
         return reply(200, login);
@@ -113,6 +139,7 @@ const server = createServer(async (req, res) => {
       login = {
         state: "pending",
         loginId: result.loginId,
+        expiresAt: Date.now() + 10 * 60 * 1000,
         verificationUrl: result.verificationUrl,
         userCode: result.userCode,
       };
@@ -136,8 +163,12 @@ const server = createServer(async (req, res) => {
       req.method === "GET" &&
       req.url === "/account"
     )
-      return reply(200, { account: null });
-    reply(503, { error: "codex_request_failed" });
+      return reply(200, { account: null, reauthenticationRequired: true });
+    reply(503, {
+      error: ["not_connected", "quota_exhausted"].includes(error.message)
+        ? error.message
+        : "codex_request_failed",
+    });
   }
 });
 server.listen(Number(process.env.PORT || 3000), "::");

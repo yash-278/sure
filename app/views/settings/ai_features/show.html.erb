@@ -1,0 +1,98 @@
+<%= content_for :page_title, t(".title") %>
+<%= settings_section title: t(".title") do %>
+  <p class="text-secondary mb-4"><%= t(".description") %></p>
+  <%= styled_form_with url: settings_ai_feature_path, method: :patch, scope: :controls do |form| %>
+    <div class="space-y-3 mb-6">
+      <div class="flex items-center justify-between gap-4">
+        <%= form.label :sharing, t(".sharing") %>
+        <%= render DS::Toggle.new(id: "controls_sharing", name: "controls[sharing]", checked: Current.user.ai_enabled, aria: { label: t(".sharing") }) %>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <%= form.label :paused, t(".pause") %>
+        <%= render DS::Toggle.new(id: "controls_paused", name: "controls[paused]", checked: Setting.codex_background_paused, aria: { label: t(".pause") }) %>
+      </div>
+      <%= form.submit t(".save_controls") %>
+    </div>
+  <% end %>
+  <h2 class="text-lg font-medium mb-3"><%= t(".connections") %></h2>
+  <% @connections.each do |connection| %>
+    <div class="border border-primary rounded-lg p-4 mb-3">
+      <div class="flex items-center justify-between gap-3">
+        <span class="font-medium"><%= connection[:name] %></span>
+        <%= render DS::Pill.new(label: t(".states.#{connection.dig(:status, :state)}")) %>
+      </div>
+      <p class="text-secondary text-sm"><%= t(".checked", time: connection.dig(:status, :checked_at) ? l(connection.dig(:status, :checked_at), format: :long) : t(".unknown")) %></p>
+      <% if connection.dig(:status, :account) %>
+        <p class="text-sm"><%= connection.dig(:status, :account, "email") %> · <%= connection.dig(:status, :account, "planType") || t(".unknown") %></p>
+      <% end %>
+      <% connection.dig(:status, :windows)&.each do |window| %>
+        <p class="text-sm"><%= t(".quota", used: window["usedPercent"] || t(".unknown"), reset: window["resetsAt"] ? l(Time.at(window["resetsAt"]), format: :long) : t(".unknown")) %></p>
+      <% end %>
+      <p class="text-secondary text-sm mb-3"><%= t(connection[:id] == "codex" ? ".subscription" : ".api_billing") %></p>
+      <% if connection[:id] == "codex" %>
+        <% if connection.dig(:status, :state).in?(%w[connected disconnected expired]) %>
+          <%= render DS::Button.new(text: t(connection.dig(:status, :state) == "disconnected" ? ".connect" : ".reconnect"), href: settings_codex_connection_path, method: :post, variant: "secondary") %>
+        <% end %>
+        <%= link_to t(".manage_connection"), settings_codex_connection_path, class: "text-link text-sm" %>
+      <% else %>
+        <%= link_to t(".api_credentials"), settings_hosting_path, class: "text-link" %>
+      <% end %>
+    </div>
+  <% end %>
+  <%= link_to t(".check_again"), settings_ai_feature_path(feature: @feature), class: "text-link" %>
+  <div class="flex flex-col md:flex-row gap-6 mt-6">
+    <nav class="md:w-56 shrink-0 space-y-2" aria-label="<%= t(".features") %>">
+      <% Ai::Features::OPERATIONS.each_key do |feature| %>
+        <%= link_to settings_ai_feature_path(feature: feature), class: "block rounded-lg p-3 border #{feature == @feature ? 'border-primary bg-container' : 'border-transparent'}" do %>
+          <span class="font-medium"><%= t(".feature.#{feature}.name") %></span>
+          <span class="block text-xs text-secondary"><%= ai_feature_status(@connections, feature, @features.configuration(feature)) %></span>
+        <% end %>
+      <% end %>
+    </nav>
+    <section class="min-w-0 grow space-y-4">
+      <h2 class="text-lg font-medium"><%= t(".feature.#{@feature}.name") %></h2>
+      <p><%= t(".feature.#{@feature}.description") %></p>
+      <p class="text-sm text-secondary"><%= t(".data_used") %> <%= t(".feature.#{@feature}.data") %></p>
+      <p class="text-sm text-secondary" title="<%= t(".guidance") %>"><%= t(".feature.#{@feature}.guidance") %></p>
+      <% selected = @selection["model"].present? ? "#{@selection['connection']}:#{@selection['model']}" : "" %>
+      <%= styled_form_with url: settings_ai_feature_path, method: :get, data: { controller: "auto-submit-form" } do |form| %>
+        <%= hidden_field_tag :feature, @feature %>
+        <%= form.select :choice, ai_model_options(@connections, @feature, @selection), { label: t(".model") }, { data: { auto_submit_form_target: "auto" } } %>
+        <noscript><%= form.submit t(".show_options") %></noscript>
+      <% end %>
+      <%= styled_form_with url: settings_ai_feature_path, method: :patch, scope: :configuration do |form| %>
+        <%= hidden_field_tag :feature, @feature %>
+        <%= form.hidden_field :choice, value: selected %>
+        <% if @model && @model["reasoning"].any? %>
+          <%= form.select :reasoning, options_for_select([[t(".choose_reasoning"), ""]] + @model["reasoning"].map { |level| [level.humanize, level] }, @selection["reasoning"]), { label: t(".reasoning") }, { required: true } %>
+        <% else %>
+          <p class="text-secondary text-sm"><%= t(".no_reasoning") %></p>
+        <% end %>
+        <%= form.submit t(".save_feature") %>
+      <% end %>
+      <%= styled_form_with url: settings_ai_feature_path, method: :post do |form| %>
+        <%= hidden_field_tag :feature, @feature %>
+        <%= hidden_field_tag :confirm_usage, "1" %>
+        <p class="text-secondary text-sm mb-2"><%= t(".test_notice") %></p>
+        <%= form.submit t(".test"), disabled: @features.configuration(@feature).blank? %>
+      <% end %>
+      <%= render DS::Disclosure.new(title: t(".manual")) do %>
+        <%= styled_form_with url: settings_ai_feature_path, method: :post do |form| %>
+          <%= hidden_field_tag :feature, @feature %>
+          <%= hidden_field_tag :confirm_usage, "1" %>
+          <%= form.select :connection, [["OpenAI API", "openai"], ["Anthropic API", "anthropic"]], label: t(".connection") %>
+          <%= form.text_field :manual_model, label: t(".model_id"), required: true %>
+          <%= form.text_field :reasoning, label: t(".manual_reasoning") %>
+          <%= form.label :images, t(".images") %>
+          <%= render DS::Toggle.new(id: "images", name: "images", checked: false, aria: { label: t(".images") }) %>
+          <p class="text-secondary text-sm"><%= t(".test_notice") %></p>
+          <%= form.submit t(".verify") %>
+        <% end %>
+      <% end %>
+    </section>
+  </div>
+  <div class="border-t border-primary mt-6 pt-4">
+    <h2 class="font-medium"><%= t(".search") %></h2>
+    <p class="text-secondary"><%= t(".search_unavailable") %></p>
+  </div>
+<% end %>

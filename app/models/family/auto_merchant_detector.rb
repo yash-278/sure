@@ -61,12 +61,9 @@ class Family::AutoMerchantDetector
   private
     attr_reader :family, :transaction_ids
 
-    # Honors Setting.llm_provider (issue #2113) — Provider::Anthropic implements
-    # auto_detect_merchants (PR #1984), so batch merchant detection routes to the
-    # configured provider, with fallback handled by
-    # Provider::Registry.preferred_llm_provider.
+    # Owner-managed families use their explicit feature selection.
     def llm_provider
-      Provider::Registry.preferred_llm_provider
+      Ai::Features.provider(:merchant_detection, family: family)
     end
 
     def default_logo_provider_url

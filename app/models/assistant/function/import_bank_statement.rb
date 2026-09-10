@@ -95,7 +95,7 @@ class Assistant::Function::ImportBankStatement < Assistant::Function
     # Extract transactions from the PDF using the configured LLM provider.
     # Honors Setting.llm_provider (issue #2113) — Provider::Anthropic implements
     # extract_bank_statement (PR #1985).
-    provider = Provider::Registry.preferred_llm_provider
+    provider = Ai::Features.provider(:statement_extraction, family: user.family)
     unless provider
       return {
         success: false,

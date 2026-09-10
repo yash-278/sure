@@ -18,14 +18,17 @@ class Provider::Codex::Client
     request["Content-Type"] = "application/json"
     request.body = body.to_json if body
     response = http.request(request)
-    raise Provider::Codex::Error, "ChatGPT connection is unavailable" unless response.is_a?(Net::HTTPSuccess)
+    unless response.is_a?(Net::HTTPSuccess)
+      code = JSON.parse(response.body)["error"] rescue nil
+      raise Provider::Codex::Error.new("ChatGPT connection is unavailable", failure_code: code == "not_connected" ? :not_connected : code == "quota_exhausted" ? :quota_exhausted : :unreachable)
+    end
     JSON.parse(response.body)
   rescue IOError, SystemCallError, Timeout::Error, JSON::ParserError
     raise Provider::Codex::Error, "ChatGPT connection is unavailable"
   end
 
-  def generate(prompt:, schema:, family:, operation:, model: nil, images: [], interactive: false)
-    payload = { prompt: prompt, schema: schema, images: images, model: model.presence, priority: interactive ? "interactive" : "background" }
+  def generate(prompt:, schema:, family:, operation:, model: nil, images: [], interactive: false, reasoning: Current.ai_reasoning)
+    payload = { prompt: prompt, schema: schema, images: images, model: model.presence, reasoning: reasoning, priority: interactive ? "interactive" : "background" }
     payload[:id] = Digest::SHA256.hexdigest([ family.id, operation, payload.to_json ].join(":"))
     result = request(:post, "/operations", payload)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 240

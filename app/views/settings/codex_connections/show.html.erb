@@ -1,4 +1,5 @@
 <%= content_for :page_title, t(".title") %>
+<p><%= link_to t("settings.ai_features.show.title"), settings_ai_feature_path, class: "text-link" %></p>
 <%= settings_section title: t(".title") do %>
   <div class="space-y-4" data-controller="codex-login" data-codex-login-pending-value="<%= @login&.dig("state") == "pending" %>">
     <%= render DS::Pill.new(label: t(".preview")) %>
@@ -8,6 +9,7 @@
     <% end %>
     <% if @unavailable %>
       <p class="text-warning"><%= t(".unavailable") %></p>
+      <%= render DS::Button.new(text: t("settings.ai_features.show.reconnect"), href: settings_codex_connection_path, method: :post) %>
     <% elsif @account %>
       <p><%= t(".connected", email: @account["email"], plan: @account["planType"].presence || t(".unknown")) %></p>
       <% if @limits&.dig("rateLimits").blank? %>
@@ -34,6 +36,9 @@
       <%= link_to t(".open_login"), "https://auth.openai.com/codex/device", target: "_blank", rel: "noopener noreferrer", class: "text-link" %>
       <%= render DS::Button.new(text: t(".cancel"), href: settings_codex_connection_path, method: :patch, params: { cancel_login: "1" }, variant: "secondary") %>
     <% else %>
+      <% if @login&.dig("state").in?(%w[expired failed]) %>
+        <p class="text-warning"><%= t("settings.ai_features.show.login_retry") %></p>
+      <% end %>
       <%= render DS::Button.new(text: t(".connect"), href: settings_codex_connection_path, method: :post) %>
     <% end %>
     <p class="text-sm text-secondary"><%= t(".limits_notice") %></p>

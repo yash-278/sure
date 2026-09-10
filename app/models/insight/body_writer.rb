@@ -43,7 +43,7 @@ class Insight::BodyWriter
 
       response = provider.chat_response(
         prompt,
-        model: provider.class.effective_model,
+        model: provider.respond_to?(:selected_model) ? provider.selected_model : provider.class.effective_model,
         instructions: SYSTEM_PROMPT,
         family: family
       )
@@ -70,6 +70,6 @@ class Insight::BodyWriter
       return @provider if defined?(@provider)
       return @provider = nil unless family.users.any?(&:ai_enabled?)
 
-      @provider = Provider::Registry.preferred_llm_provider
+      @provider = Ai::Features.provider(:insight_narration, family: family)
     end
 end

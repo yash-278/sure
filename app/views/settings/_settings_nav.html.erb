@@ -33,6 +33,7 @@ nav_sections = [
         { label: t(".mcp_label"), path: settings_mcp_path, icon: "plug" },
         { label: t(".debug_label", default: "Debug"), path: settings_debug_path, icon: "bug", if: Current.user&.super_admin? },
         { label: t(".background_jobs_label"), path: settings_background_jobs_path, icon: "list-checks", if: Current.user&.super_admin? },
+        { label: t("settings.ai_features.show.title"), path: settings_ai_feature_path, icon: "sparkles", if: Provider::Codex.available_for?(Current.user) },
         { label: t(".self_hosting_label"), path: settings_hosting_path, icon: "database", if: self_hosted? },
         { label: t(".imports_label"), path: imports_path, icon: "download" },
         { label: t(".exports_label"), path: family_exports_path, icon: "upload" },

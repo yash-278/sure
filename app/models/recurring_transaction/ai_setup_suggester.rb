@@ -64,7 +64,7 @@ class RecurringTransaction
       end
 
       def llm_provider
-        Provider::Registry.preferred_llm_provider
+        Ai::Features.provider(:bill_suggestions, family: family)
       end
 
       def charges_from(entries)

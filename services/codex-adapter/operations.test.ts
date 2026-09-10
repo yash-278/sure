@@ -197,3 +197,78 @@ test("generation timeout interrupts active work", async (t) => {
   assert.equal(interrupted, true);
   assert.equal(ops.get("timeout").error, "generation_timeout");
 });
+
+test("unsupported reasoning is rejected before starting a thread", async (t) => {
+  const ops = setup(t);
+  const calls = [];
+  ops.rpc = {
+    call: async (method) => {
+      calls.push(method);
+      if (method === "account/read") return { account: { type: "chatgpt" } };
+      if (method === "account/rateLimits/read") return {};
+      if (method === "model/list")
+        return {
+          data: [
+            {
+              id: "chosen",
+              supportedReasoningEfforts: [{ reasoningEffort: "low" }],
+            },
+          ],
+        };
+      assert.fail("Must not start a turn for unsupported reasoning");
+    },
+  };
+  await assert.rejects(
+    ops.generate({
+      ...request("bad-effort"),
+      model: "chosen",
+      reasoning: "high",
+    }),
+    /reasoning_not_supported/,
+  );
+  assert.equal(calls.includes("thread/start"), false);
+});
+
+test("explicit reasoning reaches the turn without changing the model", async (t) => {
+  const ops = setup(t);
+  const { EventEmitter } = await import("node:events");
+  const rpc = new EventEmitter();
+  rpc.call = async (method, params) => {
+    if (method === "account/read") return { account: { type: "chatgpt" } };
+    if (method === "account/rateLimits/read") return {};
+    if (method === "model/list")
+      return {
+        data: [
+          {
+            id: "chosen",
+            supportedReasoningEfforts: [{ reasoningEffort: "low" }],
+          },
+        ],
+      };
+    if (method === "thread/start") {
+      assert.equal(params.model, "chosen");
+      return { thread: { id: "thread" } };
+    }
+    if (method === "turn/start") {
+      assert.equal(params.effort, "low");
+      setTimeout(() => {
+        rpc.emit("item/agentMessage/delta", {
+          threadId: "thread",
+          delta: '{"ok":true}',
+        });
+        rpc.emit("turn/completed", {
+          threadId: "thread",
+          turn: { id: "turn", status: "completed" },
+        });
+      }, 1);
+      return { turn: { id: "turn" } };
+    }
+  };
+  ops.rpc = rpc;
+  const result = await ops.generate({
+    ...request("effort"),
+    model: "chosen",
+    reasoning: "low",
+  });
+  assert.deepEqual(result.output, { ok: true });
+});

@@ -17,7 +17,7 @@ class CodexToolApproval < ApplicationRecord
   def approve!
     with_lock do
       return result unless status == "pending"
-      raise Provider::Codex::Error, "Connection is not available" unless Provider::Codex.selected? && Provider::Codex.available_for?(user) && user.ai_enabled?
+      raise Provider::Codex::Error, "Connection is not available" unless (Provider::Codex.selected? || Ai::Features.managed?(user.family)) && Provider::Codex.available_for?(user) && user.ai_enabled?
       function = Assistant.function_classes(user).find { |klass| klass.name == function_name }&.new(user)
       raise Provider::Codex::Error, "This action is no longer available" unless function
       arguments = JSON.parse(arguments_json)

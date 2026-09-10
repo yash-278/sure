@@ -78,3 +78,9 @@ refresh_maintained_goal_targets:
   class: "RefreshMaintainedGoalTargetsJob"
   queue: "scheduled"
   description: "Recomputes the floor of reserves expressed in months of expenses"
+
+resume_subscription_ai:
+  cron: "*/5 * * * *"
+  class: "CodexResumeJobsJob"
+  queue: "scheduled"
+  description: "Resume eligible deferred AI work after verified connection recovery"
