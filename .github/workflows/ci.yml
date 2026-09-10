@@ -104,6 +104,11 @@ jobs:
       - name: Lint/Format js code
         run: npm run lint
 
+      - name: Check private Codex adapter
+        run: |
+          ./node_modules/.bin/biome check --config-path services/codex-adapter services/codex-adapter
+          node --test services/codex-adapter/*.test.ts
+
   test_unit:
     runs-on: ubuntu-latest
     timeout-minutes: 10

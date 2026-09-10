@@ -106,7 +106,7 @@ class Assistant::Function::ImportBankStatement < Assistant::Function
 
     response = provider.extract_bank_statement(
       pdf_content: pdf_import.pdf_file_content,
-      model: openai_model,
+      model: Provider::Codex.selected? ? Provider::Codex.effective_model : openai_model,
       family: family
     )
 
@@ -127,6 +127,10 @@ class Assistant::Function::ImportBankStatement < Assistant::Function
         error: "no_transactions_found",
         message: "Could not extract any transactions from the bank statement"
       }
+    end
+
+    if Provider::Codex.selected? && result[:currency].present? && result[:currency] != account.currency
+      return { success: false, error: "currency_mismatch", message: "Choose an account matching the statement currency before importing." }
     end
 
     # Create a CSV from extracted transactions

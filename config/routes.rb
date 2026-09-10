@@ -286,6 +286,8 @@ Rails.application.routes.draw do
   end
 
   # AI chats
+  resources :codex_tool_approvals, only: %i[show update]
+
   resources :chats do
     resources :messages, only: :create do
       member do
@@ -362,6 +364,8 @@ Rails.application.routes.draw do
   end
 
   namespace :settings do
+    resource :codex_connection, only: %i[show create update destroy]
+
     resource :profile, only: [ :show, :destroy ]
     resource :preferences, only: %i[show update]
     resource :budget_shares, only: :update

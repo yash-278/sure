@@ -50,6 +50,8 @@ class Assistant::Function::SearchFamilyFiles < Assistant::Function
   end
 
   def call(params = {})
+    return { success: false, error: "unavailable", message: "Document search is not available with ChatGPT subscription mode." } if Provider::Codex.selected?
+
     query = params["query"]
     max_results = (params["max_results"] || 10).to_i.clamp(1, 20)
 

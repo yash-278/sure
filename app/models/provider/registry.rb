@@ -24,6 +24,8 @@ class Provider::Registry
     # one configured) keeps working. Returns nil when neither is configured —
     # callers guard on that.
     def preferred_llm_provider
+      return codex if Provider::Codex.selected?
+
       order = Setting.llm_provider == "anthropic" ? %i[anthropic openai] : %i[openai anthropic]
       order.each do |name|
         provider = get_provider(name)
@@ -37,6 +39,10 @@ class Provider::Registry
     end
 
     private
+      def codex
+        Provider::Codex.new if Provider::Codex.configured?
+      end
+
       def stripe
         secret_key = ENV["STRIPE_SECRET_KEY"]
         webhook_secret = ENV["STRIPE_WEBHOOK_SECRET"]
@@ -206,7 +212,7 @@ class Provider::Registry
       when :securities
         %i[twelve_data yahoo_finance tiingo eodhd alpha_vantage mfapi binance_public moex_public tinkoff_invest]
       when :llm
-        %i[openai anthropic]
+        Provider::Codex.selected? ? %i[codex] : %i[openai anthropic]
       when :property_valuations
         %i[rentcast realie]
       else

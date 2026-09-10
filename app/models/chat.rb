@@ -27,6 +27,9 @@ class Chat < ApplicationRecord
     /access token/i
   ].freeze
 
+  has_many :codex_tool_approvals, dependent: :destroy
+  has_many :codex_tool_executions, dependent: :destroy
+
   belongs_to :user
 
   has_one :viewer, class_name: "User", foreign_key: :last_viewed_chat_id, dependent: :nullify # "Last chat user has viewed"
@@ -58,6 +61,8 @@ class Chat < ApplicationRecord
     # provider's classes would later raise "no LLM provider supports model …"
     # even when the other provider is configured.
     def default_model
+      return Provider::Codex.effective_model || "codex" if Provider::Codex.selected?
+
       prefers_anthropic = Setting.llm_provider == "anthropic"
 
       if prefers_anthropic && Provider::Anthropic.configured?

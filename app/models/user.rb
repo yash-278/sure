@@ -194,6 +194,8 @@ class User < ApplicationRecord
   end
 
   def ai_available?
+    return Provider::Codex.available_for?(self) if Provider::Codex.selected?
+
     return true unless Rails.application.config.app_mode.self_hosted?
 
     effective_type = ENV["ASSISTANT_TYPE"].presence || family&.assistant_type.presence || "builtin"

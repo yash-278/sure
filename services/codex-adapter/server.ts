@@ -1,0 +1,152 @@
+import { spawn } from "node:child_process";
+import { timingSafeEqual } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { createServer } from "node:http";
+import { Operations } from "./operations.ts";
+import { CodexRpc } from "./rpc.ts";
+
+const token = process.env.ADAPTER_TOKEN;
+if (!token || token.length < 32)
+  throw new Error("ADAPTER_TOKEN must be configured");
+const codexHome = process.env.CODEX_HOME || "/data/codex";
+mkdirSync(codexHome, { recursive: true, mode: 0o700 });
+const child = spawn("codex", ["app-server"], {
+  env: { PATH: process.env.PATH, HOME: "/home/node", CODEX_HOME: codexHome },
+  stdio: ["pipe", "pipe", "pipe"],
+});
+const rpc = new CodexRpc(child);
+let login = null;
+rpc.on("account/login/completed", (event) => {
+  if (login?.loginId === event.loginId) {
+    login = {
+      loginId: event.loginId,
+      state: event.success ? "connected" : "failed",
+    };
+  }
+});
+await rpc.initialize();
+const operations = new Operations(
+  rpc,
+  process.env.OPERATIONS_DIR || "/data/operations",
+);
+
+function authorised(header) {
+  const supplied = Buffer.from(header || "");
+  const expected = Buffer.from(`Bearer ${token}`);
+  return (
+    supplied.length === expected.length && timingSafeEqual(supplied, expected)
+  );
+}
+
+const server = createServer(async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  const reply = (status, body) => {
+    res.writeHead(status);
+    res.end(JSON.stringify(body));
+  };
+  if (req.method === "GET" && req.url === "/health")
+    return reply(rpc.ready ? 200 : 503, { ready: rpc.ready });
+  if (!authorised(req.headers.authorization))
+    return reply(401, { error: "unauthorized" });
+  try {
+    if (req.method === "GET" && req.url === "/account") {
+      const result = await rpc.call("account/read", { refreshToken: false });
+      // Never return tokens even if upstream adds fields in a later release.
+      return reply(200, {
+        account: result.account
+          ? {
+              type: result.account.type,
+              email: result.account.email,
+              planType: result.account.planType,
+            }
+          : null,
+      });
+    }
+    if (req.method === "GET" && req.url === "/models")
+      return reply(200, await rpc.call("model/list", { includeHidden: false }));
+    if (req.method === "GET" && req.url === "/limits") {
+      const limits = await rpc.call("account/rateLimits/read");
+      return reply(200, {
+        ordinaryUsageAllowed: limits.ordinaryUsageAllowed,
+        rateLimits: limits.rateLimits,
+        rateLimitsByLimitId: limits.rateLimitsByLimitId,
+      });
+    }
+    if (req.method === "GET" && req.url === "/settings")
+      return reply(200, { paused: operations.paused });
+    if (req.method === "POST" && req.url === "/settings") {
+      const body = await readBody(req);
+      if (typeof body.paused !== "boolean")
+        return reply(422, { error: "invalid_request" });
+      operations.pause(body.paused);
+      return reply(200, { paused: operations.paused });
+    }
+    if (req.method === "POST" && req.url === "/operations")
+      return reply(202, operations.submit(await readBody(req)));
+    const operationPath = req.url?.match(
+      /^\/operations\/([a-zA-Z0-9_-]{1,128})$/,
+    );
+    if (operationPath && req.method === "GET") {
+      const operation = operations.get(operationPath[1]);
+      return reply(operation ? 200 : 404, operation || { error: "not_found" });
+    }
+    if (operationPath && req.method === "DELETE") {
+      await operations.cancel(operationPath[1]);
+      return reply(200, { status: "cancelled" });
+    }
+    if (req.method === "GET" && req.url === "/login")
+      return reply(200, login || { state: "idle" });
+    if (req.method === "POST" && req.url === "/login") {
+      if (login?.state === "pending" || login?.state === "starting")
+        return reply(200, login);
+      login = { state: "starting" };
+      let result = null;
+      try {
+        result = await rpc.call("account/login/start", {
+          type: "chatgptDeviceCode",
+        });
+      } catch (error) {
+        login = { state: "failed" };
+        throw error;
+      }
+      login = {
+        state: "pending",
+        loginId: result.loginId,
+        verificationUrl: result.verificationUrl,
+        userCode: result.userCode,
+      };
+      return reply(200, login);
+    }
+    if (req.method === "DELETE" && req.url === "/login") {
+      if (login?.loginId)
+        await rpc.call("account/login/cancel", { loginId: login.loginId });
+      login = null;
+      return reply(200, { state: "cancelled" });
+    }
+    if (req.method === "DELETE" && req.url === "/account") {
+      await operations.disconnect();
+      login = null;
+      return reply(200, { state: "disconnected" });
+    }
+    reply(404, { error: "not_found" });
+  } catch {
+    reply(503, { error: "codex_request_failed" });
+  }
+});
+server.listen(Number(process.env.PORT || 3000), "::");
+rpc.on("unavailable", () => server.close(() => process.exit(1)));
+process.on("SIGTERM", () => {
+  child.kill("SIGTERM");
+  server.close();
+});
+
+async function readBody(req) {
+  let body = "";
+  for await (const chunk of req) {
+    body += chunk;
+    if (Buffer.byteLength(body) > 15 * 1024 * 1024)
+      throw new Error("request_too_large");
+  }
+  return JSON.parse(body);
+}

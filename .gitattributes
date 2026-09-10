@@ -16,3 +16,6 @@ bin/* text eol=lf
 *.sh text eol=lf
 *.rb text eol=lf
 .devcontainer/.bashrc text eol=lf
+
+# Synthetic statement PDFs are binary fixtures, including ASCII-only PDF encodings.
+test/fixtures/files/imports/codex_*.pdf binary

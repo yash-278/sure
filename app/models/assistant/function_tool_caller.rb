@@ -4,13 +4,21 @@ class Assistant::FunctionToolCaller
 
   attr_reader :functions
 
-  def initialize(functions = [])
+  def initialize(functions = [], chat: nil)
     @functions = functions
+    @chat = chat
   end
 
   def fulfill_requests(function_requests)
     function_requests.map do |function_request|
-      result = execute(function_request)
+      result = if Provider::Codex.selected? && @chat && replaces_valuation?(function_request)
+        approval = CodexToolApproval.for_request(@chat, function_request)
+        approval.status == "approved" ? approval.result : { status: approval.status, message: "The balance replacement needs approval before it can run.", approval_url: Rails.application.routes.url_helpers.codex_tool_approval_path(approval) }
+      elsif Provider::Codex.selected? && @chat
+        CodexToolExecution.once(@chat, function_request) { execute(function_request) }
+      else
+        execute(function_request)
+      end
 
       ToolCall::Function.from_function_request(function_request, result)
     end
@@ -21,6 +29,14 @@ class Assistant::FunctionToolCaller
   end
 
   private
+    def replaces_valuation?(request)
+      return false unless request.function_name == "record_valuation"
+      arguments = JSON.parse(request.function_args)
+      @chat.user.family.accounts.writable_by(@chat.user).find_by(id: arguments["account_id"])&.entries&.valuations&.exists?(date: arguments["date"])
+    rescue JSON::ParserError
+      false
+    end
+
     # Tool failures come back as data instead of raising, so one bad call no
     # longer aborts the whole turn. The hint steers the model toward a single
     # corrected retry (the system prompt pairs it with a retry-once rule).

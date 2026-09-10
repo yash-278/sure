@@ -1,0 +1,15 @@
+<div class="p-4 space-y-4">
+  <h1 class="text-xl font-medium"><%= t(".title") %></h1>
+  <p class="text-secondary"><%= t(".description") %></p>
+  <dl class="space-y-2">
+    <% JSON.parse(@approval.arguments_json).each do |key, value| %>
+      <div><dt class="font-medium"><%= key.humanize %></dt><dd><%= value %></dd></div>
+    <% end %>
+  </dl>
+  <% if @approval.status == "pending" %>
+    <%= render DS::Button.new(text: t(".approve"), href: codex_tool_approval_path(@approval), method: :patch, params: { decision: "approve" }) %>
+    <%= render DS::Button.new(text: t(".reject"), href: codex_tool_approval_path(@approval), method: :patch, params: { decision: "reject" }, variant: "secondary") %>
+  <% else %>
+    <p><%= t(".resolved") %></p>
+  <% end %>
+</div>

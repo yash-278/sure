@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_201444) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_10_070200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -426,6 +426,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_201444) do
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.index ["user_id"], name: "index_chats_on_user_id"
+  end
+
+  create_table "codex_deferred_jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "job_id", null: false
+    t.string "reason", null: false
+    t.datetime "resume_at"
+    t.text "serialized_job", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_id"], name: "index_codex_deferred_jobs_on_job_id", unique: true
+  end
+
+  create_table "codex_tool_approvals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "arguments_json", null: false
+    t.uuid "chat_id", null: false
+    t.datetime "created_at", null: false
+    t.string "digest", null: false
+    t.string "function_name", null: false
+    t.jsonb "result"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["chat_id", "digest"], name: "index_codex_tool_approvals_on_chat_id_and_digest", unique: true
+    t.index ["chat_id"], name: "index_codex_tool_approvals_on_chat_id"
+    t.index ["user_id"], name: "index_codex_tool_approvals_on_user_id"
+  end
+
+  create_table "codex_tool_executions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "chat_id", null: false
+    t.datetime "created_at", null: false
+    t.string "request_key", null: false
+    t.jsonb "result"
+    t.datetime "updated_at", null: false
+    t.index ["chat_id", "request_key"], name: "index_codex_tool_executions_on_chat_id_and_request_key", unique: true
+    t.index ["chat_id"], name: "index_codex_tool_executions_on_chat_id"
   end
 
   create_table "coinbase_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -2658,6 +2693,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_201444) do
   add_foreign_key "budgets", "users", on_delete: :cascade
   add_foreign_key "categories", "families"
   add_foreign_key "chats", "users"
+  add_foreign_key "codex_tool_approvals", "chats"
+  add_foreign_key "codex_tool_approvals", "users"
+  add_foreign_key "codex_tool_executions", "chats"
   add_foreign_key "coinbase_accounts", "coinbase_items"
   add_foreign_key "coinbase_items", "families"
   add_foreign_key "coinstats_accounts", "coinstats_items"

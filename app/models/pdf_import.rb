@@ -297,6 +297,9 @@ class PdfImport < Import
       end
 
       currency = account&.currency || family.currency
+      if extracted_data["extraction_provider"] == "codex" && extracted_data["currency"].present? && extracted_data["currency"] != currency
+        raise Provider::Codex::Error, "Statement currency does not match the selected account. Choose an account with the statement currency before importing."
+      end
       candidates = extracted_transactions.map.with_index(1) do |txn, index|
         Import::Row.new(
           import: self,
