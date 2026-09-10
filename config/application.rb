@@ -6,6 +6,12 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# Set the driver before Rails initializes its cache and other Redis clients.
+if ENV["WEB_SERVERLESS"] == "true"
+  require_relative "../lib/serverless_redis_connection"
+  ServerlessRedisConnection.install!
+end
+
 module Sure
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
