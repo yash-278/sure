@@ -82,3 +82,24 @@ an API provider as part of automatic recovery.
 Run `node --test *.test.ts` here and the repository's required Rails, system,
 Ruby/ERB, Biome and Brakeman checks before publishing changes. Railway hosting
 is billed separately from the shared Codex subscription allowance.
+
+## Idle sleep
+
+The HTTP adapter starts without a Codex child process. The first account, model,
+quota, login or generation request starts Codex and initializes its protocol.
+After 60 seconds without work, the adapter terminates that child without logging
+out. Credentials and completed operation records remain on the `/data` volume.
+Health checks and reads of saved operation status do not start Codex.
+
+Active RPC calls, generations, pending device login and queued operations prevent
+idle shutdown. This includes paused or quota-waiting queued work, which remains
+in memory and must not be lost to an intentional shutdown. Abandoned device
+login expires after ten minutes even when nobody polls it. Unexpected child
+failure retains the existing service restart and interrupted-operation behavior.
+
+Enable Railway Serverless on the adapter and deploy for the setting to apply.
+Keep its persistent volume and private networking unchanged. Verify a real
+request from Sure's worker wakes it within the existing client timeouts before
+considering rollout complete. The first AI request after sleep takes longer.
+Rollback by disabling Serverless and redeploying the previous adapter image;
+never clear the credential volume to roll back a lifecycle change.

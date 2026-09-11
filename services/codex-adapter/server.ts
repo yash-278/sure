@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { createServer } from "node:http";
+import { LazyRpc } from "./lifecycle.ts";
 import { Operations } from "./operations.ts";
 import { CodexRpc } from "./rpc.ts";
 
@@ -10,21 +11,35 @@ if (!token || token.length < 32)
   throw new Error("ADAPTER_TOKEN must be configured");
 const codexHome = process.env.CODEX_HOME || "/data/codex";
 mkdirSync(codexHome, { recursive: true, mode: 0o700 });
-const child = spawn("codex", ["app-server"], {
-  env: { PATH: process.env.PATH, HOME: "/home/node", CODEX_HOME: codexHome },
-  stdio: ["pipe", "pipe", "pipe"],
-});
-const rpc = new CodexRpc(child);
 let login = null;
+let loginTimer = null;
+const rpc = new LazyRpc(
+  () =>
+    new CodexRpc(
+      spawn("codex", ["app-server"], {
+        env: {
+          PATH: process.env.PATH,
+          HOME: "/home/node",
+          CODEX_HOME: codexHome,
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      }),
+    ),
+  () =>
+    operations.running ||
+    operations.queue.length > 0 ||
+    login?.state === "pending" ||
+    login?.state === "starting",
+);
 rpc.on("account/login/completed", (event) => {
   if (login?.loginId === event.loginId) {
+    clearTimeout(loginTimer);
     login = {
       loginId: event.loginId,
       state: event.success ? "connected" : "failed",
     };
   }
 });
-await rpc.initialize();
 const operations = new Operations(
   rpc,
   process.env.OPERATIONS_DIR || "/data/operations",
@@ -46,7 +61,7 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify(body));
   };
   if (req.method === "GET" && req.url === "/health")
-    return reply(rpc.ready ? 200 : 503, { ready: rpc.ready });
+    return reply(200, { ready: true });
   if (!authorised(req.headers.authorization))
     return reply(401, { error: "unauthorized" });
   try {
@@ -103,8 +118,13 @@ const server = createServer(async (req, res) => {
         await operations.cancel(operations.currentRequest);
       return reply(200, { status: "cancelled" });
     }
-    if (req.method === "POST" && req.url === "/operations")
-      return reply(202, operations.submit(await readBody(req)));
+    if (req.method === "POST" && req.url === "/operations") {
+      const operation = operations.submit(await readBody(req));
+      // A paused queue is still in-memory work. Keep Codex present just as for
+      // an active queue, even when this is the first request after idle sleep.
+      if (operations.queue.length > 0) await rpc.ensure();
+      return reply(202, operation);
+    }
     const operationPath = req.url?.match(
       /^\/operations\/([a-zA-Z0-9_-]{1,128})$/,
     );
@@ -143,16 +163,34 @@ const server = createServer(async (req, res) => {
         verificationUrl: result.verificationUrl,
         userCode: result.userCode,
       };
+      clearTimeout(loginTimer);
+      loginTimer = setTimeout(
+        async () => {
+          if (login?.state !== "pending") return;
+          const loginId = login.loginId;
+          try {
+            await rpc.call("account/login/cancel", { loginId });
+          } catch {
+            /* The expiry must release the login even if Codex failed. */
+          } finally {
+            if (login?.loginId === loginId) login = { state: "expired" };
+          }
+        },
+        10 * 60 * 1000,
+      );
+      loginTimer.unref();
       return reply(200, login);
     }
     if (req.method === "DELETE" && req.url === "/login") {
       if (login?.loginId)
         await rpc.call("account/login/cancel", { loginId: login.loginId });
+      clearTimeout(loginTimer);
       login = null;
       return reply(200, { state: "cancelled" });
     }
     if (req.method === "DELETE" && req.url === "/account") {
       await operations.disconnect();
+      clearTimeout(loginTimer);
       login = null;
       return reply(200, { state: "disconnected" });
     }
@@ -174,7 +212,8 @@ const server = createServer(async (req, res) => {
 server.listen(Number(process.env.PORT || 3000), "::");
 rpc.on("unavailable", () => server.close(() => process.exit(1)));
 process.on("SIGTERM", () => {
-  child.kill("SIGTERM");
+  clearTimeout(loginTimer);
+  void rpc.close();
   server.close();
 });
 
